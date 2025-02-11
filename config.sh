@@ -26,6 +26,17 @@ PASS_PHRASE=""       # Passphrase for the private key
 # TO-DO, depends on how policy is defined and the corresponding API syntax
 
 # Other configuration (unset e.g for testing purposes)
-VALIDATE="y"        # Leave empty if changes should not be validated
+VALIDATE="Y"        # Leave empty if changes should not be validated
 COMMIT="Y"          # Leave empty if changes should not be commited
 UPDATE_POLICY="Y"   # Leave empty if policy should not be updated
+
+
+# -----------------------------------------------------------------------------
+# Additional Notes: 
+# In case you don't have an API Key, you can request it using the following command: 
+# curl --location https://firewall_ip/api/?type=keygen --request POST 
+# --data "user=username&password=your_password" 
+# The response will include the key. 
+# You will need to enable API access first on the firewall first:
+# https://docs.paloaltonetworks.com/pan-os/11-1/pan-os-panorama-api/pan-os-api-authentication/enable-api-access
+# -----------------------------------------------------------------------------
