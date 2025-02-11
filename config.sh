@@ -16,7 +16,7 @@ CERTIFICATE_NAME="SSCert"   # Name of the certificate once imported in the firew
 
 # Local certificates configuration
 CERTIFICATE_PATH=""  # Path to the certificate file, if stored locally
-PRIVATE_KEY_PATH=""  # Path to the private key file, if stored locally
+PRIVATE_KEY_PATH=""  # Path to the private key file, if stored locally. Must include 'key' in name! 
 PASS_PHRASE=""       # Passphrase for the private key
 
 # Remote certificate configuration 
@@ -26,5 +26,6 @@ PASS_PHRASE=""       # Passphrase for the private key
 # TO-DO, depends on how policy is defined and the corresponding API syntax
 
 # Other configuration (unset e.g for testing purposes)
+VALIDATE="y"        # Leave empty if changes should not be validated
 COMMIT="Y"          # Leave empty if changes should not be commited
 UPDATE_POLICY="Y"   # Leave empty if policy should not be updated
