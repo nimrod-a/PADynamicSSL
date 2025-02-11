@@ -3,8 +3,9 @@
 # -----------------------------------------------------------------------------
 # Description: The script imports certificates and private keys into a PaloAlto firewall
 #              via REST and XML API calls.It supports both PEM and PKCS12 formats, 
-#              with local and external certificate setups.
+#              with local and external certificate setups. .
 # Author: Nimrod Adam
+# Email: na@caskan.com
 # License: MIT License
 # Version: 1.2
 # Date: 07.02.2025
@@ -64,7 +65,7 @@ import_cert() {
 
                 # API call to import private key
                 response=$(curl -F "file=@${file_path}" \
-                    "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=keypair&certificate-name=${CERTIFICATE_NAME}&format=pem&passphrase=${PASS_PHRASE}")
+                    "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=private-key&certificate-name=${CERTIFICATE_NAME}&format=pem&passphrase=${PASS_PHRASE}")
            
             else
                 # Import certificate
@@ -110,10 +111,26 @@ import_cert() {
     fi
 }
 
+# Function to validate the candidate configuration
+validate_changes() {
+    echo "Validating changes..."
+    
+    # API call to validate changes
+    response=$(curl -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<validate><full></full></validate>&key=${API_KEY}")
+
+    # Error handling of response from API call
+    if [[ $response == *"<response status='success'"* ]]; then
+        echo "Changes validated successfully."
+    else
+        echo "ERROR: validating changes failed with the following reposnse: $response"
+        exit 1
+    fi
+}
+
 # Function to commit changes
 commit_changes() {
     echo "Committing changes..."
-    
+
     # API call to commit changes
     response=$(curl -X GET "https://${FIREWALL_IP}/api/?type=commit&cmd=<commit></commit>&key=${API_KEY}")
 
@@ -175,6 +192,13 @@ else
     echo "INFO: UPDATE_POLICY not set. Skipping decyrption policy update"
 fi
 
+# Validate changes if set
+if [[ -n "$VALIDATE" ]]; then
+    validate_changes    
+else 
+    echo "INFO: VALIDATE not set. Skipping committing changes"
+fi
+
 # Commit changes if set
 if [[ -n "$COMMIT" ]]; then
     commit_changes    
@@ -183,5 +207,3 @@ else
 fi
 
 echo "Script execution completed!"
-
-
