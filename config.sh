@@ -35,7 +35,7 @@ UPDATE_POLICY="Y"   # Leave empty if policy should not be updated
 # Additional Notes: 
 # In case you don't have an API Key, you can request it using the following command: 
 # curl --location https://firewall_ip/api/?type=keygen --request POST 
-# --data "user=username&password=your_password" 
+# --data user=username&password=your_password
 # The response will include the key. 
 # You will need to enable API access first on the firewall first:
 # https://docs.paloaltonetworks.com/pan-os/11-1/pan-os-panorama-api/pan-os-api-authentication/enable-api-access
