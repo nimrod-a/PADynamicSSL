@@ -5,8 +5,8 @@
 #              with local and external certificate setups.   
 # Author: Nimrod Adam
 # License: MIT License
-# Version: 1.2
-# Date: 07.02.2025
+# Version: 1.3
+# Date: 20.02.2025
 # -----------------------------------------------------------------------------
 
 # Mandatory Configuration Variables
@@ -15,21 +15,21 @@ API_KEY="ABC123"                  # API key for the firewall
 CERTIFICATE_NAME="SSCert"   # Name of the certificate once imported in the firewall.  Default: SSCert
 
 # Local certificates configuration
-CERTIFICATE_PATH=""  # Path to the certificate file, if stored locally
-PRIVATE_KEY_PATH=""  # Path to the private key file, if stored locally. Must include 'key' in name! 
+CERTIFICATE_PATH="test/test-cert.pem"  # Path to the certificate file, if stored locally.
+PRIVATE_KEY_PATH="test/test-key.pem"  # Path to the private key file, if stored locally. Must include 'key' in name! 
 PASS_PHRASE=""       # Passphrase for the private key
 
-# Remote certificate configuration 
-# TO-DO, depends on how cert is fetched
+CHECK_HASH="Y"       # Leave empty if there is not need to check if key/cert changed since last run
+declare -A FILE_HASHES  # Associative array to store file hashes. Used to check if key changed since last run
 
 # Decryption policy configuration 
 # TO-DO, depends on how policy is defined and the corresponding API syntax
 
 # Other configuration (unset e.g for testing purposes)
-VALIDATE="Y"        # Leave empty if changes should not be validated
-COMMIT="Y"          # Leave empty if changes should not be commited
-UPDATE_POLICY="Y"   # Leave empty if policy should not be updated
-
+VALIDATE=""        # Leave empty if changes should not be validated
+COMMIT=""          # Leave empty if changes should not be commited
+UPDATE_POLICY=""   # Leave empty if policy should not be updated
+TEST_CONNECTIVITY="" # Leave empty to skip connectivity checks. Only for testing!
 
 # -----------------------------------------------------------------------------
 # Additional Notes: 
@@ -39,4 +39,6 @@ UPDATE_POLICY="Y"   # Leave empty if policy should not be updated
 # The response will include the key. 
 # You will need to enable API access first on the firewall first:
 # https://docs.paloaltonetworks.com/pan-os/11-1/pan-os-panorama-api/pan-os-api-authentication/enable-api-access
+# 
 # -----------------------------------------------------------------------------
+
