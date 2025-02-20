@@ -3,12 +3,11 @@
 # -----------------------------------------------------------------------------
 # Description: The script imports certificates and private keys into a PaloAlto firewall
 #              via REST and XML API calls.It supports both PEM and PKCS12 formats, 
-#              with local and external certificate setups. .
+#              with local and external certificate setups.
 # Author: Nimrod Adam
-# Email: na@caskan.com
 # License: MIT License
-# Version: 1.2
-# Date: 07.02.2025
+# Version: 1.3
+# Date: 20.02.2025
 # -----------------------------------------------------------------------------
 
 # Exit script on any errors
@@ -53,9 +52,9 @@ test_connect() {
     fi
 
     # Test API key access by requesting firewall information
-    printf "Testing API access\n"
+    printf "Testing API access...\n"
 
-     response=$(curl -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<show><system><info></info></system></show>&key=${API_KEY}")
+     response=$(curl --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<show><system><info></info></system></show>&key=${API_KEY}")
 
     # Error handling of response from API call
     if [[ $response == *"<response status='success'"* ]]; then
@@ -67,10 +66,35 @@ test_connect() {
     fi
 }
 
-# Function to fetch external certificates 
-fetch_cert() {
-    # TO-DO: Implement the logic to fetch a certificate, probably via cert-manager
-    printf "Fetching certificate from X ... (TO-DO)\n"
+# Function to check via hashes if cert/key changed since last run
+check_file_hash() {
+    local file_path="$1"
+    local file_name=$(basename "$file_path")
+
+    # Calculate the current hash
+    local current_hash
+    current_hash=$(sha256sum "$file_path" | awk '{ print $1 }')
+    printf "Current Hash of $file_name: $current_hash\n"
+
+    # Check if the hash already exists in the config
+    if grep -q "FILE_HASHES\[$file_name\]=" "$CONFIG_FILE"; then
+        # Get the existing hash
+        local existing_hash
+        existing_hash=$(grep "FILE_HASHES\[$file_name\]=" "$CONFIG_FILE" | awk -F'=' '{ print $2 }' | tr -d ' "')
+
+        # Compare the hashes
+        if [[ "$existing_hash" != "$current_hash" ]]; then
+            # Hash has changed, update it if set
+            printf "Hash of $file_name has changed. Saving new hash to config... \n"
+            sed -i "s|FILE_HASHES\[$file_name\]=.*|FILE_HASHES[$file_name]=\"$current_hash\"|" "$CONFIG_FILE"
+            export hash_changed="true"
+        fi
+    else
+        # If no hash exists, add it
+        printf "No previous hash of $file_name exists. Saving new hash to config...\\n"
+        echo "FILE_HASHES[$file_name]=\"$current_hash\"" >> "$CONFIG_FILE"
+        export hash_changed="true"
+    fi
 }
 
 # Function to update decryption policy rule
@@ -98,9 +122,9 @@ import_cert() {
                     printf "Please set the passphrase in the config file [config.sh] \n"
                     exit 1
                 fi
-                
+
                 # API call to import private key
-                response=$(curl -F "file=@${file_path}" \
+                response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
                     "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=private-key&certificate-name=${CERTIFICATE_NAME}&format=pem&passphrase=${PASS_PHRASE}")
            
             else
@@ -108,7 +132,7 @@ import_cert() {
                 printf "Trying to import certificate: $file_name\n"
 
                 # API call to import certificate
-                response=$(curl -F "file=@${file_path}" \
+                response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
                     "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=certificate&certificate-name=${CERTIFICATE_NAME}&format=pem")
                 
             fi
@@ -127,7 +151,7 @@ import_cert() {
             fi
 
             # API call to import certificate
-            response=$(curl -F "file=@${file_path}" \
+            response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
                 "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=keypair&certificate-name=${CERTIFICATE_NAME}&format=pkcs12&passphrase=${PASS_PHRASE}")
             ;;
         *)
@@ -137,8 +161,9 @@ import_cert() {
             ;;
     esac
 
+
      # Check response status
-    if [[ $response == *"<response status='success"* ]]; then
+    if [[ $response == *"<response status='success'"* ]]; then
         printf "$file_name imported succesfully!\n"
     else
         printf "ERROR: importing $file_name failed: $response\n"
@@ -151,7 +176,7 @@ validate_changes() {
     printf "Validating changes...\n"
     
     # API call to validate changes
-    response=$(curl -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<validate><full></full></validate>&key=${API_KEY}")
+    response=$(curl  --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<validate><full></full></validate>&key=${API_KEY}")
 
     # Error handling of response from API call
     if [[ $response == *"<response status='success'"* ]]; then
@@ -167,13 +192,13 @@ commit_changes() {
     printf "Committing changes...\n"
 
     # API call to commit changes
-    response=$(curl -X GET "https://${FIREWALL_IP}/api/?type=commit&cmd=<commit></commit>&key=${API_KEY}")
+    response=$(curl  --connect-timeout 6 -X GET "https://${FIREWALL_IP}/api/?type=commit&cmd=<commit></commit>&key=${API_KEY}")
 
     # Error handling of response from API call
     if [[ $response == *"<response status='success'"* ]]; then
         printf "Changes committed successfully.\n"
     else
-        printf "ERROR: committing changes failed with the following reposnse: $response\n"
+        printf "ERROR: committing changes failed with the following response: $response\n"
         exit 1
     fi
 }
@@ -181,6 +206,7 @@ commit_changes() {
 # Print configuration information
 print_configuration() {
 printf "Checking configuration...\n\n"
+
 printf "%-25s %-40s\n" "Configuration" "Value"
 printf "%-25s %-40s\n" "--------" "-----"
 
@@ -204,22 +230,51 @@ echo
 #  Main Script
 # ==============================================================================
 
-# Print current configuration 
 print_configuration
 
-# Test connection to the firewall & API Key 
-test_connect
+# Test connection
+if [[ -n $TEST_CONNECTIVITY ]]; then
+    test_connect
+else 
+    printf "INFO: TEST_CONNECTIVITY not set. Skipping connectivity checks\n"
+fi
 
 # Import certificate if set
 if [[ -n "$CERTIFICATE_PATH" ]]; then 
-    import_cert "$CERTIFICATE_PATH"
+    # Check if certificate changed 
+    if [[ -n "$CHECK_HASH" ]]; then 
+        check_file_hash "$CERTIFICATE_PATH"
+        # Import cerificate only if changed 
+        if [[ $hash_changed == "true" ]]; then
+            echo "Importing new certificate..."
+            import_cert "$CERTIFICATE_PATH"
+        else
+            echo "Hash of the certificate has not changed. Skipping import..."
+        fi
+    else 
+        printf "INFO: CHECK_HASH not set. Skipping check for certificate changes\n"
+        import_cert "$CERTIFICATE_PATH"
+    fi
 else 
     printf "INFO: CERTIFICATE_PATH not set. Skipping certificate import\n"
 fi
 
 # Import private key file if set
-if [[ -n "$PRIVATE_KEY_PATH" ]]; then
-    import_cert "$PRIVATE_KEY_PATH"
+if [[ -n "$PRIVATE_KEY_PATH" ]]; then 
+    # Check if key changed 
+    if [[ -n "$CHECK_HASH" ]]; then 
+        check_file_hash "$PRIVATE_KEY_PATH"
+        # Import key only if changed 
+        if [[ $hash_changed == "true" ]]; then
+            echo "Importing new private key..."
+            import_cert "$PRIVATE_KEY_PATH"
+        else
+            echo "Hash of the private key has not changed. Skipping import..."
+        fi
+    else 
+        printf "INFO: CHECK_HASH not set. Skipping check for private key changes\n"
+        import_cert "$PRIVATE_KEY_PATH"
+    fi
 else 
     printf "INFO: PRIVATE_KEY_PATH not set. Skipping private key import\n"
 fi
@@ -245,4 +300,6 @@ else
     printf "INFO: COMMIT not set. Skipping committing changes\n"
 fi
 
-printf "Script execution completed!"
+printf "\nScript execution completed!\n"
+
+
