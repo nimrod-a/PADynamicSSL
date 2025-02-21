@@ -1,23 +1,21 @@
 # -----------------------------------------------------------------------------
 # Description: This is an example configuration file for the 'PADynamicSSL' script,
 #              which imports certificates and private keys into a PaloAlto firewall
-#              via REST and XML API calls. The script supports both PEM and PKCS12 formats, 
-#              with local and external certificate setups.   
+#              via REST and XML API calls. The script supports both PEM and PKCS12 formats
 # Author: Nimrod Adam
 # License: MIT License
-# Version: 1.3
-# Date: 20.02.2025
+# Version: 1.2
+# Date: 07.02.2025
 # -----------------------------------------------------------------------------
 
 # Mandatory Configuration Variables
 FIREWALL_IP="1.2.3.4"              # IP address of the Palo Alto firewall
 API_KEY="ABC123"                  # API key for the firewall
-CERTIFICATE_NAME="SSCert"   # Name of the certificate once imported in the firewall.  Default: SSCert
 
 # Local certificates configuration
-CERTIFICATE_PATH="test/test-cert.pem"  # Path to the certificate file, if stored locally.
-PRIVATE_KEY_PATH="test/test-key.pem"  # Path to the private key file, if stored locally. Must include 'key' in name! 
-PASS_PHRASE=""       # Passphrase for the private key
+CERTIFICATE_PATH=""  # Path to the certificate file, if stored locally.
+PRIVATE_KEY_PATH=""  # Path to the private key file, if stored locally. Must include 'key' in name! 
+PASS_PHRASE="d"       # Passphrase for the private key / keypair
 
 CHECK_HASH="Y"       # Leave empty if there is not need to check if key/cert changed since last run
 declare -A FILE_HASHES  # Associative array to store file hashes. Used to check if key changed since last run
@@ -41,4 +39,3 @@ TEST_CONNECTIVITY="" # Leave empty to skip connectivity checks. Only for testing
 # https://docs.paloaltonetworks.com/pan-os/11-1/pan-os-panorama-api/pan-os-api-authentication/enable-api-access
 # 
 # -----------------------------------------------------------------------------
-
