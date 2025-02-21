@@ -2,8 +2,7 @@
 
 # -----------------------------------------------------------------------------
 # Description: The script imports certificates and private keys into a PaloAlto firewall
-#              via REST and XML API calls.It supports both PEM and PKCS12 formats, 
-#              with local and external certificate setups.
+#              via REST and XML API calls.It supports both PEM and PKCS12 formats.
 # Author: Nimrod Adam
 # License: MIT License
 # Version: 1.3
@@ -27,7 +26,7 @@ fi
 source "$CONFIG_FILE"
 
 # Check if required variables are set
-if [[ -z "$FIREWALL_IP" || -z "$API_KEY" || -z "$CERTIFICATE_NAME" ]]; then
+if [[ -z "$FIREWALL_IP" || -z "$API_KEY" ]]; then
     printf "ERROR: One or more required variables are not set in the configuration file.\n"
     printf "Please review your configuration at: $CONFIG_FILE\n"
     exit 1
@@ -54,7 +53,7 @@ test_connect() {
     # Test API key access by requesting firewall information
     printf "Testing API access...\n"
 
-     response=$(curl --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<show><system><info></info></system></show>&key=${API_KEY}")
+    response=$(curl --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<show><system><info></info></system></show>&key=${API_KEY}")
 
     # Error handling of response from API call
     if [[ $response == *"<response status='success'"* ]]; then
@@ -105,10 +104,11 @@ update_decryption_policy() {
 
 # Function to send an import API call to the firewall, automatically determines certificate format 
 import_cert() {
-    local file_path="$1"
-    local file_name=$(basename "$file_path")
-    local file_extension="${file_name##*.}"
-
+    local file_path="$1" # file path
+    local file_name=$(basename "$file_path") # filename, including file extension, e.g cert-backup-server.pem
+    local file_extension="${file_name##*.}" # file extension, e.g .pem , .p12
+    local file_name_fw="${filename%.*}"     # filename without extension - name of the cert on the firewall 
+    printf "$filename"
     case "$file_extension" in
         # For certificates in PEM format
         "pem")
@@ -125,7 +125,7 @@ import_cert() {
 
                 # API call to import private key
                 response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
-                    "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=private-key&certificate-name=${CERTIFICATE_NAME}&format=pem&passphrase=${PASS_PHRASE}")
+                    "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=private-key&certificate-name=${file_name_fw}&format=pem&passphrase=${PASS_PHRASE}")
            
             else
                 # Import certificate
@@ -133,7 +133,7 @@ import_cert() {
 
                 # API call to import certificate
                 response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
-                    "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=certificate&certificate-name=${CERTIFICATE_NAME}&format=pem")
+                    "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=certificate&certificate-name=${file_name_fw}&format=pem")
                 
             fi
             ;;
@@ -152,7 +152,7 @@ import_cert() {
 
             # API call to import certificate
             response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
-                "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=keypair&certificate-name=${CERTIFICATE_NAME}&format=pkcs12&passphrase=${PASS_PHRASE}")
+                "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=keypair&certificate-name=${file_name_fw}&format=pkcs12&passphrase=${PASS_PHRASE}")
             ;;
         *)
             printf "ERROR: Unsupported file type: $file_extension\n"
