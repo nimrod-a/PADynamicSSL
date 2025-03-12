@@ -4,8 +4,8 @@
 #              via REST and XML API calls. The script supports both PEM and PKCS12 formats
 # Author: Nimrod Adam
 # License: MIT License
-# Version: 1.2
-# Date: 07.02.2025
+# Version: 1.7
+# Date: 12.02.2025
 # -----------------------------------------------------------------------------
 
 # Mandatory Configuration Variables
@@ -13,12 +13,12 @@ FIREWALL_IP="1.2.3.4"              # IP address of the Palo Alto firewall
 API_KEY="ABC123"                  # API key for the firewall
 
 # Local certificates configuration
-CERTIFICATE_PATH=""  # Path to the certificate file, if stored locally.
-PRIVATE_KEY_PATH=""  # Path to the private key file, if stored locally. Must include 'key' in name! 
-PASS_PHRASE="d"       # Passphrase for the private key / keypair
-
-CHECK_HASH="Y"       # Leave empty if there is not need to check if key/cert changed since last run
-declare -A FILE_HASHES  # Associative array to store file hashes. Used to check if key changed since last run
+CERTIFICATE_PATH=""	    # Use for .p12, pfx, .cer, .crt and .pem files 
+PRIVATE_KEY_PATH="" 	# Use only for .key files. 
+PASS_PHRASE=""	        # Passphrase for the private key / keypair. If no passphrase is set, enter empty single quotes
+PEM_INCLUDES_KEY="Y"	# Set if the private key is included in the PEM certificate
+CHECK_HASH="Y"          # Leave empty if there is not need to check if key/cert changed since last run
+declare -A FILE_HASHES  # Associative array to store file hashes. Used to check if cert changed since last run
 
 # Decryption policy configuration 
 # TO-DO, depends on how policy is defined and the corresponding API syntax

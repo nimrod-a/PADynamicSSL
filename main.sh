@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # -----------------------------------------------------------------------------
-# Description: The script imports certificates and private keys into a PaloAlto firewall
-#              via REST and XML API calls.It supports both PEM and PKCS12 formats.
+# Description:  This script dynamically imports SSL certificates/keys
+# 				and creates a decryption policy via REST and XML API calls. 
+# 				The script supports both PEM and PKCS12 formats.
 # Author: Nimrod Adam
 # License: MIT License
-# Version: 1.3
-# Date: 20.02.2025
+# Version: 1.7
+# Date: 28.02.2025
 # -----------------------------------------------------------------------------
 
 # Exit script on any errors
@@ -42,7 +43,7 @@ test_connect() {
     # Test firewall connectivity
     printf "Testing connection to the firewall...\n\n"
 
-    if ping -c 1 $FIREWALL_IP &> /dev/null; then
+    if ping $FIREWALL_IP; then
         printf "Firewall is up!\n"
     else
         printf "ERROR: Failed connecting to the firewall\n"
@@ -53,10 +54,10 @@ test_connect() {
     # Test API key access by requesting firewall information
     printf "Testing API access...\n"
 
-    response=$(curl --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<show><system><info></info></system></show>&key=${API_KEY}")
+    response=$(curl -k --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<show><system><info></info></system></show>&key=${API_KEY}")
 
     # Error handling of response from API call
-    if [[ $response == *"<response status='success'"* ]]; then
+    if [[ $response == *"success"* ]]; then
         printf "API access successful.\n"
     else
         printf "ERROR: API access failed with the following error: $response\n"
@@ -102,7 +103,7 @@ update_decryption_policy() {
     printf "Updating decryption policy rule... (TO-DO)\n"
 }
 
-# Function to send an import API call to the firewall, automatically determines certificate format 
+# Function to send an import API call to the firewall, automatically determines certificate format
 import_cert() {
     local file_path="$1" # file path
     local file_name=$(basename "$file_path") # filename, including file extension, e.g cert-backup-server.pem
@@ -111,11 +112,11 @@ import_cert() {
     printf "$filename"
     case "$file_extension" in
         # For certificates in PEM format
-        "pem")
+        "pem" | "cer" | "key" | "crt")
             if [[ "$file_name" == *"key"* ]]; then
                 # Import private key (if not using keypair)
                 printf "Trying to import private key: $file_name\n"
-                
+
                 # Check if passphrase is provided
                 if [[ -z "$PASS_PHRASE" ]]; then
                     printf "ERROR: Passphrase is required for private key import.\n"
@@ -124,18 +125,23 @@ import_cert() {
                 fi
 
                 # API call to import private key
-                response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
+                response=$(curl -k  --connect-timeout 6 -F "file=@${file_path}" \
                     "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=private-key&certificate-name=${file_name_fw}&format=pem&passphrase=${PASS_PHRASE}")
            
             else
                 # Import certificate
-                printf "Trying to import certificate: $file_name\n"
-
+                printf "Trying to import certificate: $file_name.\n"
                 # API call to import certificate
-                response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
+                response=$(curl -k  --connect-timeout 6 -F "file=@${file_path}" \
                     "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=certificate&certificate-name=${file_name_fw}&format=pem")
-                
-            fi
+					
+				if [[ -n "$PEM_INCLUDES_KEY" ]]; then
+					# Also import private key from PEM certificate
+					 printf "Trying to import private key from PEM certificate: $file_name.\n"
+					 response_pem=$(curl -k  --connect-timeout 6 -F "file=@${file_path}" \
+                    "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=private-key&certificate-name=${file_name_fw}&format=pem&passphrase=${PASS_PHRASE}")
+				fi
+			fi
             ;;
 
         # For certificates in PKCS12 format
@@ -151,7 +157,7 @@ import_cert() {
             fi
 
             # API call to import certificate
-            response=$(curl  --connect-timeout 6 -F "file=@${file_path}" \
+            response=$(curl  -k --connect-timeout 6 -F "file=@${file_path}" \
                 "https://${FIREWALL_IP}/api/?key=${API_KEY}&type=import&category=keypair&certificate-name=${file_name_fw}&format=pkcs12&passphrase=${PASS_PHRASE}")
             ;;
         *)
@@ -163,12 +169,24 @@ import_cert() {
 
 
      # Check response status
-    if [[ $response == *"<response status='success'"* ]]; then
+    if [[ $response == *"success"* ]]; then
         printf "$file_name imported succesfully!\n"
     else
         printf "ERROR: importing $file_name failed: $response\n"
         exit 1
     fi
+	
+	# Check response status in case of PEM with private key
+	 if [[ -z "$response_pem" ]]; then
+               echo
+     else
+		if [[ $response_pem == *"success"* ]]; then
+			printf "Private key from PEM certificate $file_name imported succesfully!\n"
+		else
+			printf "ERROR: importing private key from PEM certificate $file_name failed: $response\n"
+        # exit 1
+		fi
+	fi
 }
 
 # Function to validate the candidate configuration
@@ -176,11 +194,12 @@ validate_changes() {
     printf "Validating changes...\n"
     
     # API call to validate changes
-    response=$(curl  --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<validate><full></full></validate>&key=${API_KEY}")
+    response=$(curl -k --connect-timeout 6 -X POST "https://${FIREWALL_IP}/api/?type=op&cmd=<validate><full></full></validate>&key=${API_KEY}")
 
     # Error handling of response from API call
-    if [[ $response == *"<response status='success'"* ]]; then
+    if [[ $response == *"success"* ]]; then
         printf "Changes validated successfully!\n"
+	printf "$response\n"
     else
         printf "ERROR: validating changes failed with the following reponse: $response\n"
         exit 1
@@ -192,12 +211,13 @@ commit_changes() {
     printf "Committing changes...\n"
 
     # API call to commit changes
-    response=$(curl  --connect-timeout 6 -X GET "https://${FIREWALL_IP}/api/?type=commit&cmd=<commit></commit>&key=${API_KEY}")
+    response=$(curl  -k --connect-timeout 6 -X GET "https://${FIREWALL_IP}/api/?type=commit&cmd=<commit></commit>&key=${API_KEY}")
 
     # Error handling of response from API call
-    if [[ $response == *"<response status='success'"* ]]; then
+    if [[ $response == *"success"* ]]; then
         printf "Changes committed successfully.\n"
-    else
+	printf "$response"
+   else
         printf "ERROR: committing changes failed with the following response: $response\n"
         exit 1
     fi
@@ -230,7 +250,7 @@ echo
 #  Main Script
 # ==============================================================================
 
-print_configuration
+#print_configuration
 
 # Test connection
 if [[ -n $TEST_CONNECTIVITY ]]; then
