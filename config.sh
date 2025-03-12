@@ -21,7 +21,19 @@ CHECK_HASH="Y"          # Leave empty if there is not need to check if key/cert 
 declare -A FILE_HASHES  # Associative array to store file hashes. Used to check if cert changed since last run
 
 # Decryption policy configuration 
-# TO-DO, depends on how policy is defined and the corresponding API syntax
+POLICY_NAME=""  # Name of the decryption policy must be unique
+CATEGORY="any"
+DESTINATION="any"
+DESTINATION_HIP="any"
+FROM_ZONE="Untrust"
+NEGATE_SOURCE="no"
+DECRYPTION_PROFILE="default"
+SERVICE="any"
+SOURCE="any"
+SOURCE_USER="any"
+SOURCE_HIP="any"
+TO_ZONE="Trust"
+CERTIFICATE_NAME_FW="" # Name of the certificate on the firewall  
 
 # Other configuration (unset e.g for testing purposes)
 VALIDATE=""        # Leave empty if changes should not be validated
