@@ -99,17 +99,94 @@ check_file_hash() {
 
 # Function to update decryption policy rule
 update_decryption_policy() {
-    # TO-DO: Implement the logic to update the decryption policy rule
-    printf "Updating decryption policy rule... (TO-DO)\n"
+    printf "\nCreating decryption policy rule... \n"
+	UUID=$(uuidgen)
+	response=$(curl -k --connect-timeout 6 -X POST "https://${FIREWALL_IP}/restapi/v11.0/Policies/DecryptionRules?name=${POLICY_NAME}&location=vsys&vsys=vsys1" \
+    -H "X-PAN-KEY: ${API_KEY}" \
+    -d "{
+        \"entry\": {
+            \"@location\": \"vsys\",
+            \"@name\": \"${POLICY_NAME}\",
+            \"@uuid\": \"${UUID}\",
+            \"@vsys\": \"vsys1\",
+            \"action\": \"decrypt\",
+            \"category\": {
+                \"member\": [
+                    \"${CATEGORY}\"
+                ]
+            },
+            \"destination\": {
+                \"member\": [
+                    \"${DESTINATION}\"
+                ]
+            },
+            \"destination-hip\": {
+                \"member\": [
+                    \"${DESTINATION_HIP}\"
+                ]
+            },
+            \"from\": {
+                \"member\": [
+                    \"${FROM_ZONE}\"
+                ]
+            },
+            \"negate-source\": \"${NEGATE_SOURCE}\",
+            \"profile\": \"${DECRYPTION_PROFILE}\",
+            \"service\": {
+                \"member\": [
+                    \"${SERVICE}\"
+                ]
+            },
+            \"source\": {
+                \"member\": [
+                    \"${SOURCE}\"
+                ]
+            },
+            \"source-hip\": {
+                \"member\": [
+                    \"${SOURCE_HIP}\"
+                ]
+            },
+            \"source-user\": {
+                \"member\": [
+                    \"${SOURCE_USER}\"
+                ]
+            },
+            \"to\": {
+                \"member\": [
+                    \"${TO_ZONE}\"
+                ]
+            },
+            \"type\": {
+                \"ssl-inbound-inspection\": {
+                    \"certificates\": {
+                        \"member\": [
+                            \"${CERTIFICATE_NAME_FW}\"
+                        ]
+                    }
+                }
+            }
+        }
+    }"
+	)
+	
+     # Check response status
+    if [[ $response == *"success"* ]]; then
+        printf "Decryption policy $POLICY_NAME created succesfully!\n"
+    else
+        printf "ERROR: Creating decryption policy $POLICY_NAME failed: $response\n"
+        exit 1
+    fi
 }
+
 
 # Function to send an import API call to the firewall, automatically determines certificate format
 import_cert() {
     local file_path="$1" # file path
     local file_name=$(basename "$file_path") # filename, including file extension, e.g cert-backup-server.pem
     local file_extension="${file_name##*.}" # file extension, e.g .pem , .p12
-    local file_name_fw="${filename%.*}"     # filename without extension - name of the cert on the firewall 
-    printf "$filename"
+    local file_name_fw="${file_name%.*}"
+
     case "$file_extension" in
         # For certificates in PEM format
         "pem" | "cer" | "key" | "crt")
@@ -300,10 +377,23 @@ else
 fi
 
 # Update policy if set
-if [[ -n "$UPDATE_POLICY" ]]; then
-    update_decryption_policy
+if [[ -n "$UPDATE_POLICY" ]]; then 
+    # Check if cert hash changed 
+    if [[ -n "$CHECK_HASH" ]]; then 
+        check_file_hash "$CERTIFICATE_PATH"
+        # Update policy only if cert changed 
+        if [[ $hash_changed == "true" ]]; then
+            echo "Updating decryption policy..."
+            update_decryption_policy
+        else
+            echo "Hash of the certificate has not changed. Skipping decryption policy update..."
+        fi
+    else 
+        printf "INFO: CHECK_HASH not set. Skipping check before decryption policy update\n"
+        update_decryption_policy
+    fi
 else 
-    printf "INFO: UPDATE_POLICY not set. Skipping decyrption policy update\n"
+    printf "INFO: UPDATE_POLICY not set. Skipping decryption policy update\n"
 fi
 
 # Validate changes if set
